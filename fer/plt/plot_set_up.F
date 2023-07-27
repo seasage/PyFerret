@@ -234,6 +234,11 @@
 * V762 *acm* 8/20 Add a second test for is this a trajectory ribbon plot.
 * v763 *acm* 9/20 Plots of id-variables in trajectory-profile, timeseries-profile data
 * v764 *acm* 8/21 Pull everything for PLOT/VS into its own setup routine, PLOT_VS_SET_UP.
+* V766 *acm* 1/22  Fix for issue 102, plots with too many tics.
+* v767 6/22 *acm* See issue 112: Detect whether axis is too large for 4-byte integer indexing -
+*		  Data would be too large to plot
+* v767 6/22 *acm* Issue 113: Differences between PLOT/SYM/LINE=n and PLOT/SYM/LINE/COLOR=c/THICK=t 
+*      1/23 *acm* Issue 131 plot/step=conntected has wrong independent axis
 
         IMPLICIT NONE
 	include 'tmap_dims.parm'
@@ -296,7 +301,8 @@
      .                  cal_name*32, cal_name_new*32, val_buff*45, fmt*4,
      .			whoimin*14, whoimax*14, 
      .			whoimin_axlo*14, whoimax_axhi*14
-	INTEGER		TM_LENSTR1, CX_DIM_LEN, CGRID_SIZE, CGRID_AXIS, 
+	INTEGER*8	CGRID_SIZE8, gsize
+	INTEGER		TM_LENSTR1, CX_DIM_LEN, CGRID_AXIS, 
      .			TM_DSG_DSET_FROM_GRID, TM_DSG_NFEATURES,
      .			mv, cx, slen, ito, indep_lab, dep_lab, nline_in_mem,
      .			indep_dim, npts, dep_dim, npts2, ndv, var1,
@@ -335,7 +341,7 @@
 	IF ( mode_diagnostic ) CALL SPLIT_LIST(pttmode_ops, ttout_lun,
      .				'setting up plot', 15)
 
-	  
+
 * limits error check
         IF (nmv .GT. max_line_on_plot) GOTO 5050
 
@@ -511,9 +517,12 @@
 
 * determine PLOT+ memory required
         plot_mem_used = 0
-        DO 10 ipl = 1, numv
- 10     plot_mem_used = plot_mem_used
-     .		      + 2*step_inc*CGRID_SIZE( cx_list(ipl) )
+        DO ipl = 1, numv
+	   gsize = CGRID_SIZE8( cx_list(ipl) )
+	   IF (plot_mem_used + 2*step_inc*gsize .GT. 
+     .         arbitrary_large_int4) GOTO 5300
+	   plot_mem_used = plot_mem_used + 2*step_inc*gsize 
+	ENDDO
 
 * check for improper data supplied
 	IF ( overlay ) THEN
@@ -723,7 +732,7 @@ c	      ul_dolab(t_dim) = .FALSE.  ! why was this added?
      .				status	)
 
 	      iaxis = CGRID_AXIS(dep_dim,cx)
-	   
+
 	   ENDIF
 
 	   IF ( status .NE. ferr_ok ) GOTO 5000
@@ -757,6 +766,8 @@ c	      ul_dolab(t_dim) = .FALSE.  ! why was this added?
 	         dep_dat(3*i-2) = dep_dat(i)
 	      END DO
 	   ENDIF
+
+	   npts = nload
 
 * set up corresponding independent axis
 * ( note - each variable may have different points on the indep. axis )
@@ -940,13 +951,14 @@ c	      ul_dolab(t_dim) = .FALSE.  ! why was this added?
 	   nload_all = MAX(nload, nload_all)
  200	CONTINUE
 
-        nline_on = nline_on + color1 - 1
+* Fix for issue 113. IF /COLOR= then color1 is negative
+        nline_on = nline_on + MAX(1,color1) - 1
 
 * axis scaling and formatting
 * ... independent axis
 
 	IF ( .NOT.overlay ) THEN
-	      
+
 	      delta = unspecified_val8
 
 	      IF ( pindeplim .GT. 0 ) THEN
@@ -960,7 +972,7 @@ c	      ul_dolab(t_dim) = .FALSE.  ! why was this added?
      .			indep_dim, ind_min, ind_max, delta,
      .			formatted, range_rqd, cal_id_1, status )
 	         IF ( status .NE. ferr_OK ) GOTO 5000
-		 
+
 *  Check for valid log axis before proceeding
 	         IF (indep_is_log) THEN
 	            CALL AXIS_ENDS  ( indep_ax, indep_dim, grid1,
@@ -1055,7 +1067,14 @@ c		       ind_max = indep_dat(1) + 240*3600
 * ... dependent axis scaling
 *  force axis scaling if the data has no range
 
-           IF (the_taxis .EQ. 0) the_taxis = dep_dim
+	   IF (the_taxis .EQ. 0) the_taxis = dep_dim
+
+* Fix for issue 102:
+* The direction of the dependent variable is really only applicable for VS plots, e.g.
+* lon vs lat or time vs something. For classic dependent variables, dep_dim can 
+* just be 2, data is a function of the independent variable.
+
+	      IF (.NOT.versus) the_taxis = y_dim
 
 	   IF ( pdeplim .GT. 0 ) THEN
 	      IF (pylim.GT.0 .AND. .NOT.denig_xylim_msg_done) THEN
@@ -1071,7 +1090,7 @@ c		       ind_max = indep_dat(1) + 240*3600
 		 IF (nok .EQ. 0) GOTO 5171
 	         dep_min = lo
 	         dep_max = hi
-	         
+
 	         CALL AXIS_ENDS( dep_ax, the_taxis, grid, dep_min, dep_max, 
      .                        delta, dep_is_log, dep_axtyp, versus, status )
 
@@ -1119,7 +1138,7 @@ c		       ind_max = indep_dat(1) + 240*3600
 	      CALL AXIS_ENDS( dep_ax, the_taxis, grid, dep_min, dep_max, 
      .                        delta, dep_is_log, dep_axtyp, versus, status )
      
-	   ENDIF
+	   ENDIF  ! pdeplim
 	   IF ( status .NE. ferr_OK ) THEN
 	      first = dep_min
 	      last  = dep_max
@@ -1278,4 +1297,9 @@ c		       ind_max = indep_dat(1) + 240*3600
      .		'Plot trajectoryProfile data as trajectory, '//
      .          'only for a single variable',
      .		*5000 )
+
+ 5300   CALL ERRMSG( ferr_out_of_range, status,
+     .     'data too large to plot'//pCR//
+     .      cmnd_buff(:len_cmnd), *5100 )
+
 	END

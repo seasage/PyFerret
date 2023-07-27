@@ -74,6 +74,8 @@
 * v6.931 acm 11/14 Delete ALL the stat* symbols that may be left over from 
 *                  a previous evaluation. STAT/BRIEF does not reset them all.
 * V720 *acm*  3/17 Ticket 2512: Add STAT/PRECICISION=
+* v767 6/22 *acm* See issue 112: The total size could need INTEGER*8
+* 11/2022 *acm* Code cleanup: Modernize DO-loop syntax. 
 
         IMPLICIT NONE
 	include 'tmap_dims.parm'
@@ -95,7 +97,8 @@
 	REAL    dat( m1lox:m1hix,m1loy:m1hiy,m1loz:m1hiz,m1lot:m1hit,m1loe:m1hie,m1lof:m1hif )
 
 * internal variable declarations:
-	INTEGER	TM_LENSTR1, CGRID_SIZE, GET_MAX_STRING_LEN,
+	INTEGER*8 CGRID_SIZE8
+	INTEGER	TM_LENSTR1, GET_MAX_STRING_LEN,
      .		i, j, k, l, m, n, nbad, ngood, ntot, idim,
      .		len_line, len_set_name, grid, slen, i1, i2, nok, 
      .		listdims, nfig, max_dig
@@ -103,7 +106,7 @@
 	REAL*8	sum, sum2, xmean, zmean, x, xdelta, variance_c, diff
 
 	CHARACTER*255	VAR_TITLE, VAR_TITLE_MOD, vname_buff
-	CHARACTER	TM_FMT*48, LEFINT*20, AX_TITLE*32, CX_SIZE_STR*24,
+	CHARACTER	TM_FMT*48, LEFINT*20, LEFINT8*20, AX_TITLE*32, CX_SIZE_STR*24,
      .			line_buff*130, title*32, bl13*13, symbuff*30
 	PARAMETER (bl13 = '             ' )
 
@@ -166,7 +169,7 @@
 * string variables
 	IF ( mr_type(mv) .EQ. ptype_string ) THEN
 	   rbuff(1) = LEFINT(GET_MAX_STRING_LEN(cx,mv,dat), slen) 
-	   rbuff(2) = LEFINT(CGRID_SIZE(cx), slen)
+	   rbuff(2) = LEFINT8(CGRID_SIZE8(cx), slen)
 	   rbuff(3) = CX_SIZE_STR(cx,listdims,len_line)
 	   CALL SPLIT_LIST(pttmode_explct, lun,
      .			' Total # of strings: '//
@@ -178,12 +181,12 @@
 
 * pass 1: compute mean 
         IF (mode_6d_lab) THEN
-	   DO 200 n = cx_lo_s6(cx), cx_hi_s6(cx)
-	   DO 200 m = cx_lo_s5(cx), cx_hi_s5(cx)
-	   DO 200 l = cx_lo_s4(cx), cx_hi_s4(cx)
-	   DO 200 k = cx_lo_s3(cx), cx_hi_s3(cx)
-	   DO 200 j = cx_lo_s2(cx), cx_hi_s2(cx)
-	   DO 200 i = cx_lo_s1(cx), cx_hi_s1(cx)
+	   DO n = cx_lo_s6(cx), cx_hi_s6(cx)
+	   DO m = cx_lo_s5(cx), cx_hi_s5(cx)
+	   DO l = cx_lo_s4(cx), cx_hi_s4(cx)
+	   DO k = cx_lo_s3(cx), cx_hi_s3(cx)
+	   DO j = cx_lo_s2(cx), cx_hi_s2(cx)
+	   DO i = cx_lo_s1(cx), cx_hi_s1(cx)
 
 	      datum = dat(i,j,k,l,m,n)
 
@@ -196,7 +199,12 @@
 	         large = MAX( large, datum )
                  sum   = sum + datum
 	      ENDIF
- 200	   CONTINUE
+	   ENDDO
+	   ENDDO
+	   ENDDO
+	   ENDDO
+	   ENDDO
+	   ENDDO
 	ELSE 
 * If the data is 4D, and the user has canceled mode_6d_lab, just 
 * compute and list the 4D result.
@@ -205,11 +213,10 @@
      .	       cx_lo_s5(cx) .NE. unspecified_int4) GOTO 5100
 	   m = unspecified_int4
 	   n = unspecified_int4
-	   DO 210 m = cx_lo_s5(cx), cx_hi_s5(cx)
-	   DO 210 l = cx_lo_s4(cx), cx_hi_s4(cx)
-	   DO 210 k = cx_lo_s3(cx), cx_hi_s3(cx)
-	   DO 210 j = cx_lo_s2(cx), cx_hi_s2(cx)
-	   DO 210 i = cx_lo_s1(cx), cx_hi_s1(cx)
+	   DO l = cx_lo_s4(cx), cx_hi_s4(cx)
+	   DO k = cx_lo_s3(cx), cx_hi_s3(cx)
+	   DO j = cx_lo_s2(cx), cx_hi_s2(cx)
+	   DO i = cx_lo_s1(cx), cx_hi_s1(cx)
 
 	      datum = dat(i,j,k,l,m,n)
 
@@ -222,7 +229,10 @@
 	         large = MAX( large, datum )
                  sum   = sum + datum
 	      ENDIF
- 210	   CONTINUE
+	   ENDDO
+	   ENDDO
+	   ENDDO
+	   ENDDO
 	ENDIF
 
         IF ( ngood .GT. 0 ) mean = sum / FLOAT(ngood)
@@ -242,12 +252,12 @@
            zmean = mean
 
            IF (mode_6d_lab) THEN
-	      DO 300 n = cx_lo_s6(cx), cx_hi_s6(cx)
-	      DO 300 m = cx_lo_s5(cx), cx_hi_s5(cx)
-	      DO 300 l = cx_lo_s4(cx), cx_hi_s4(cx)
-	      DO 300 k = cx_lo_s3(cx), cx_hi_s3(cx)
-	      DO 300 j = cx_lo_s2(cx), cx_hi_s2(cx)
-	      DO 300 i = cx_lo_s1(cx), cx_hi_s1(cx)
+	      DO n = cx_lo_s6(cx), cx_hi_s6(cx)
+	      DO m = cx_lo_s5(cx), cx_hi_s5(cx)
+	      DO l = cx_lo_s4(cx), cx_hi_s4(cx)
+	      DO k = cx_lo_s3(cx), cx_hi_s3(cx)
+	      DO j = cx_lo_s2(cx), cx_hi_s2(cx)
+	      DO i = cx_lo_s1(cx), cx_hi_s1(cx)
 
 	         x = dat(i,j,k,l,m,n)
 	         IF ( x .NE. bad ) THEN
@@ -257,15 +267,21 @@
                     xmean = xmean + xdelta/FLOAT(nok)
                     sum2 = sum2 + xdelta*(x - xmean)  ! This expression uses the new value of mean
  	         ENDIF
-
- 300	      CONTINUE
+	      ENDDO
+	      ENDDO
+	      ENDDO
+	      ENDDO
+	      ENDDO
+	      ENDDO
            ELSE  ! 4D result
-	      DO 310 n = cx_lo_s6(cx), cx_hi_s6(cx)
-	      DO 310 m = cx_lo_s5(cx), cx_hi_s5(cx)
-	      DO 310 l = cx_lo_s4(cx), cx_hi_s4(cx)
-	      DO 310 k = cx_lo_s3(cx), cx_hi_s3(cx)
-	      DO 310 j = cx_lo_s2(cx), cx_hi_s2(cx)
-	      DO 310 i = cx_lo_s1(cx), cx_hi_s1(cx)
+	      IF (cx_lo_s6(cx) .NE. unspecified_int4 .OR.
+     .	          cx_lo_s5(cx) .NE. unspecified_int4) GOTO 5100
+	      m = unspecified_int4
+	      n = unspecified_int4
+	      DO l = cx_lo_s4(cx), cx_hi_s4(cx)
+	      DO k = cx_lo_s3(cx), cx_hi_s3(cx)
+	      DO j = cx_lo_s2(cx), cx_hi_s2(cx)
+	      DO i = cx_lo_s1(cx), cx_hi_s1(cx)
 
 	         x = dat(i,j,k,l,m,n)
 	         IF ( x .NE. bad ) THEN
@@ -275,8 +291,10 @@
                     xmean = xmean + xdelta/FLOAT(nok)
                     sum2 = sum2 + xdelta*(x - xmean)  ! This expression uses the new value of mean
  	         ENDIF
-
- 310	      CONTINUE 
+	      ENDDO
+	      ENDDO
+	      ENDDO
+	      ENDDO
            ENDIF
 
            variance_c = sum2/FLOAT(nok - 1)

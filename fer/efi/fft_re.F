@@ -42,6 +42,11 @@
 *                    input is a simple 1-D time series.
 * V5.53  *acm*  6/03 Correct the frequency axis:  why was there a factor of
 *                     1.001 in freqn = 1.001*yquist?
+* V7.65 *acm*  10/22 Fix for issue 126: incorrect frequency axis
+C  11/2022 *acm* Code cleanup: Update FFTPACK code to F90 standard, from
+C                https://github.com/fortran-lang/fftpack.git 
+*                Send an integer work array along with wft tom avoid 
+*                type-mismatch warnings
 *
 * This function returns the real part of the FFT transform. The result time
 * axis is a custom axis in period 1./time  The time axis must be regular.
@@ -149,9 +154,9 @@
       INTEGER arg_lo_ss(6,EF_MAX_ARGS),
      .        arg_hi_ss(6,EF_MAX_ARGS),
      .        arg_incr (6,EF_MAX_ARGS)
-      INTEGER arg, nd
+      INTEGER arg, nd, i
       CHARACTER outunits*32
-      REAL boxsize(1)
+      REAL boxsize(1), yquist, freq1, freqn, half
       CHARACTER ax_name(6)*16, ax_units(6)*16
       LOGICAL backward(6), modulo(6), regular(6)
 
@@ -176,29 +181,28 @@
 
 C  The FFT code returns frequencies W(k) for k=1 to N/2, with N/2 rounded down
 
-c      nfreq = nd/2	
-c      yquist = 1./(2.*boxsize(1))		! Nyquist frequency
-c
-c      freq1 = 1.* yquist/ float(nfreq)
-c!      freqn = 1.001*yquist  !  WHY THE 1.001???
-c      freqn = yquist
-c
-cC  Set label for the frequency axis CYC/units.
-c
-c      outunits = 'CYC/' // ax_units(T_AXIS)
-c
-c      CALL ef_set_custom_axis (id, T_AXIS, freq1, freqn, freq1, 
-c     .                         outunits, NO)
+C Fix for issue 126: ef_set_freq_axis was incorrect and is not needed
+C now that real numbers are double precision
+C The FFT code returns frequencies W(k) for k=1 to N/2, with N/2 rounded down
+C The fundamental frequency freq1 based on 1/N with no rounding.
 
+      half = FLOAT(nd)/2.
+      yquist = 1./(2.*boxsize(1))		! Nyquist frequency
 
-C Use ef_set_freq_axis (if we could let freq1, freqn be double precision
-C in the ef_set_custom_axis call, that would be equivalent.)
-C
+      freq1 = yquist/ half
+      freqn = yquist
+
+      DO i = 1, nd
+	if (float(i)* freq1 .GT. freqn) exit
+      ENDDO
+      IF (i .GT. half) freqn = float(i-1)* freq1
+
 C  Set label for the frequency axis CYC/units.
 
       outunits = 'CYC/' // ax_units(T_AXIS)
 
-      CALL ef_set_freq_axis (id, T_AXIS, nd, boxsize(1), outunits, NO)
+      CALL ef_set_custom_axis (id, T_AXIS, freq1, freqn, freq1, 
+     .                         outunits, NO)\
 
 *                                                                      ^
 *                                                                      |
@@ -290,7 +294,7 @@ C  The FFT code returns frequencies W(k) for k=1 to N/2, with N/2 rounded down
 
       mtdat = 1 + arg_hi_ss(T_AXIS,ARG1) - arg_lo_ss(T_AXIS,ARG1)
 
-      mtwork = 2.5* mtdat + 15
+      mtwork = 2.5* mtdat
 
 * a
       CALL ef_set_work_array_dims_6d(id, 1,
@@ -373,6 +377,12 @@ C  The FFT code returns frequencies W(k) for k=1 to N/2, with N/2 rounded down
       INTEGER i1, j1, k1, l1, m1, n1
       CHARACTER*128 err_msg
 
+* In addition to the array wft, will allocate an integer array iwft.
+* Previously a portion of the work array wft was used for this, sending 
+* a real array into fftpack routines that want an integer array.
+
+      INTEGER iwft(15)
+
    40 FORMAT ('FFT_RE encountered missing data at (i,j,k,l,m,n)', 6I5)
    50 FORMAT ('FFT_RE encountered missing data at L=', I5)
 
@@ -405,9 +415,9 @@ C  The FFT code returns frequencies W(k) for k=1 to N/2, with N/2 rounded down
          GO TO 999
       ENDIF
 
-*  Set WFT for fft; prime factorization of ND and trig functions.
+* Set WFT and IWFT for fft; prime factorization of ND and trig functions.
 
-      CALL rffti (nd, wft)
+      CALL rffti (nd, wft, iwft)
 
       n1 = arg_lo_ss(F_AXIS,ARG1)
       DO 600 n=res_lo_ss(F_AXIS), res_hi_ss(F_AXIS)
@@ -447,7 +457,7 @@ C  The FFT code returns frequencies W(k) for k=1 to N/2, with N/2 rounded down
                   l1 = l1 + arg_incr(T_AXIS,ARG1)
  400           CONTINUE
 
-               CALL four_re (nd, ts, a, b, wft)
+               CALL four_re (nd, ts, a, b, wft, iwft)
 
                DO 410 l = res_lo_ss(T_AXIS), res_hi_ss(T_AXIS) 
                    result(i,j,k,l,m,n) = a(l,1,1,1,1,1)

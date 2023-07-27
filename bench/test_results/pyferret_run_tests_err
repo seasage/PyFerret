@@ -691,14 +691,10 @@ Executed by script: *** GO bn_odd_variable_name.jnl ***
 *** Running ferret script: bn_test_stream.jnl
  LISTing to file permutedBinaryTest.dat
  LISTing to file junk.dat
- **ERROR: request exceeds memory setting
+ **ERROR: value out of legal range: data too large to read
+          load num
 load num
 Executed by script: *** GO bn_test_stream.jnl ***
-    To fulfill this request would exceed the current SET MEMORY/MAX= limit of 500Mb
-    At the moment that the memory limit was reached
-    memory was committed as follows:
-        - to objects used in computation: 0 (0%)
-    The size of the requested object was: 192 Gb (38400%)
 Replacing definition of axis YAX
 Replacing definition of axis ZAX
 Replacing definition of axis TAX
@@ -799,12 +795,6 @@ Replacing definition of axis XAX2
  **ERROR: invalid command: PATTERN style is not available in PyFerret
 shade/pal=black/lev=(10,30,5,-3)/line/key/pattern=4patterns/nolabel sst
 Executed by script: *** GO bn_pattern.jnl ***
- **ERROR: command syntax: LANDI_MAPXMIN = ???
-DEFINE VARIABLE landi_mapxmin =
-Executed by script: *** GO land thick ***
- **ERROR: command syntax: LANDI_MAPXMAX = ???
-DEFINE VARIABLE landi_mapxmax =
-Executed by script: *** GO land thick ***
            *** NOTE: the use of "SET MODE METAFILE" is deprecated;
            *** NOTE: instead use "FRAME /FILE=... /FORMAT=..."
  **ERROR: invalid command: PATTERN style is not available in PyFerret
@@ -2215,7 +2205,9 @@ Executed by script: *** GO bn_cdf_errmsg.jnl ***
              Data set: http://ferret.pmel.noaa.gov/pmel/thredds/dodsC/data/PMEL/COADS/coads_nothing.cdf
 SET DAT/FORM=CDF "http://ferret.pmel.noaa.gov/pmel/thredds/dodsC/data/PMEL/COADS/coads_nothing.cdf"
 Executed by script: *** GO bn_cdf_errmsg.jnl ***
+Error:curl error: Couldn't resolve host name
 curl error details: 
+Warning:oc_open: Could not read url
  **Internet Data error
              NetCDF: I/O failure (OPeNDAP/netCDF Error code -68)
              Data set: http://noserver/a/nofile.cdf
@@ -2495,7 +2487,9 @@ ooooooooooooooooooooooooooooooooooooooooooo
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
 *** Running ferret script: bn_test_opendap.jnl
+Error:curl error: Couldn't resolve host name
 curl error details: 
+Warning:oc_open: Could not read url
 *** Running ferret script: bn611_bug_fixes.jnl
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
@@ -3744,10 +3738,6 @@ ooooooooooooooooooooooooooooooooooooooooooo
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
-           *** NOTE: the use of "SET MODE METAFILE" is deprecated;
-           *** NOTE: instead use "FRAME /FILE=... /FORMAT=..."
-           *** NOTE: the use of "SET MODE METAFILE" is deprecated;
-           *** NOTE: instead use "FRAME /FILE=... /FORMAT=..."
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
@@ -3787,6 +3777,7 @@ Replacing definition of axis AXI_COARSE
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
@@ -4451,6 +4442,7 @@ LIST/PREC=7 tempz6d_unmatch
 Executed by script: *** GO bn_auxiliary.jnl ***
 Replacing definition of axis ZAX
 *** Running ferret script: bn_plot_ribbon_gaploc.jnl
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
  **ERROR: command syntax: PLOT/VS/RIBBON/GAPLOC plot needs 4 arguments
 plot/vs/thick/line/sym=21/siz=.3/ribbon/gap xpts, 10*ypts, color
 Executed by script: *** GO bn_plot_ribbon_gaploc.jnl ***
@@ -6286,6 +6278,7 @@ ooooooooooooooooooooooooooooooooooooooooooo
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
@@ -6407,6 +6400,45 @@ Executed by script: *** GO bn_iso8601_time.jnl ***
 set axis/t0=2010-15-01 TIME1
 Executed by script: *** GO bn_iso8601_time.jnl ***
 *** Running ferret script: bn_agg_given_taxis.jnl
+/bin/ls: cannot access 'aggf/forecast_??.nc': No such file or directory
+ LISTing to file aggf/forecast_01.nc
+ LISTing to file aggf/forecast_02.nc
+ LISTing to file aggf/forecast_03.nc
+ LISTing to file aggf/forecast_04.nc
+ LISTing to file aggf/forecast_05.nc
+ LISTing to file aggf/forecast_06.nc
+ LISTing to file aggf/forecast_07.nc
+ LISTing to file aggf/forecast_08.nc
+ LISTing to file aggf/forecast_09.nc
+ LISTing to file aggf/forecast_10.nc
+ LISTing to file aggf/forecast_11.nc
+ LISTing to file aggf/forecast_12.nc
+ LISTing to file aggf/forecast_13.nc
+ LISTing to file aggf/forecast_14.nc
+ LISTing to file aggf/forecast_15.nc
+ LISTing to file aggf/forecast_16.nc
+ LISTing to file aggf/forecast_17.nc
+ LISTing to file aggf/forecast_18.nc
+ LISTing to file aggf/forecast_19.nc
+ LISTing to file aggf/forecast_20.nc
+ LISTing to file aggf/forecast_21.nc
+ LISTing to file aggf/forecast_22.nc
+ LISTing to file aggf/forecast_23.nc
+ LISTing to file aggf/forecast_24.nc
+ LISTing to file aggf/forecast_25.nc
+ LISTing to file aggf/forecast_26.nc
+ LISTing to file aggf/forecast_27.nc
+ LISTing to file aggf/forecast_28.nc
+ LISTing to file aggf/forecast_29.nc
+ LISTing to file aggf/forecast_30.nc
+ LISTing to file aggf/forecast_31.nc
+ LISTing to file aggf/forecast_32.nc
+ LISTing to file aggf/forecast_33.nc
+ LISTing to file aggf/forecast_34.nc
+ LISTing to file aggf/forecast_35.nc
+ LISTing to file aggf/forecast_36.nc
+ LISTing to file aggf/forecast_37.nc
+ LISTing to file aggf/forecast_38.nc
            *** NOTE: Time axis coordinates matched using @XACT
            *** NOTE: Time axis coordinates matched using @BIN
            *** NOTE: Time axis coordinates matched using @ASN
@@ -6693,6 +6725,7 @@ Executed by script: *** GO bn_dsg_save_uvars.jnl ***
 load sst[d=1,g=vari[d=2]]
 Executed by script: *** GO bn_dsg_point_data.jnl ***
 *** Running ferret script: bn_dsg_show_grid.jnl
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
 *** Running ferret script: bn_dsg_no_data.jnl
 *** Running ferret script: bn_dsg_orth_labels.jnl
 *** Running ferret script: bn_dsg_fcn_of_instance.jnl
@@ -6804,6 +6837,7 @@ ooooooooooooooooooooooooooooooooooooooooooo
            *** NOTE: They will not be convertible:
            *** NOTE: Units on axis "j" are not recognized: 1
            *** NOTE: They will not be convertible:
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
@@ -6929,6 +6963,7 @@ ooooooooooooooooooooooooooooooooooooooooooo
           station
  LISTing to file a.nc
  LISTing to file a.nc
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
            *** NOTE: Using Timeseriesprofile data as Profile. Converting variables to profile dimension:
           station
            *** NOTE: Using Timeseriesprofile data as Profile. Converting variables to profile dimension:
@@ -6941,6 +6976,7 @@ ooooooooooooooooooooooooooooooooooooooooooo
           trajectory
  LISTing to file a.nc
  LISTing to file a.nc
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
            *** NOTE: Using Trajectoryprofile data as Profile. Converting variables to profile dimension:
           trajectory
            *** NOTE: Using Trajectoryprofile data as Profile. Converting variables to profile dimension:
@@ -6995,6 +7031,39 @@ ooooooooooooooooooooooooooooooooooooooooooo
  PERMANENT data cleared from memory
  TEMPORARY data cleared from memory
 ooooooooooooooooooooooooooooooooooooooooooo
+ PERMANENT data cleared from memory
+ TEMPORARY data cleared from memory
+ooooooooooooooooooooooooooooooooooooooooooo
+*** Running ferret script: bn766_bug_fixes.jnl
+ PERMANENT data cleared from memory
+ TEMPORARY data cleared from memory
+ooooooooooooooooooooooooooooooooooooooooooo
+ PERMANENT data cleared from memory
+ TEMPORARY data cleared from memory
+ooooooooooooooooooooooooooooooooooooooooooo
+           *** NOTE: Unspecified or unsupported ordering of axes in variable Tinz_d: T axis is in dimension # 5
+           *** NOTE: Check the dimensions: can USE/ORDER= be applied?
+           *** NOTE: The default ordering will be used
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
+           *** NOTE:    Dataset variables have Auxiliary or Curvilinear Coordinates. Examine "coordinates" attributes.
+ PERMANENT data cleared from memory
+ TEMPORARY data cleared from memory
+ooooooooooooooooooooooooooooooooooooooooooo
+ Using every   2th vector in the Y direction
+ PERMANENT data cleared from memory
+ TEMPORARY data cleared from memory
+ooooooooooooooooooooooooooooooooooooooooooo
+Replacing definition of axis TAX
+*** Running ferret script: bn_scat2grid_bin_fcns.jnl
+           *** NOTE: Units on axis "AX003" are not recognized: na
+           *** NOTE: They will not be convertible:
+*** Running ferret script: bn_py_graticules.jnl
+ Using every   2th vector in the X direction
+           *** NOTE: /UNIT=MONTHS is ambiguous ... using 1/12 of 365.2425 days
+Replacing definition of axis TAX
+Replacing definition of axis TAX
+Replacing definition of axis TAX
 *** Running ferret script: bn_gif.jnl
  **ERROR: dimensions improperly specified: specified data is not a line
            - its a 2D region: "plot/i=1:10/j=1:20/nolabel i+j"
@@ -7189,11 +7258,11 @@ Executed by script: *** GO bn_setting_text.jnl ***
 *** Running python script: testfervar.py
 >>> >>> >>> >>> >>> >>> Traceback (most recent call last):
   File "<stdin>", line 1, in <module>
-  File "....../lib/python3.7/site-packages/pyferret/ferdset.py", line 230, in __delattr__
+  File "....../lib/python3.9/site-packages/pyferret/ferdset.py", line 230, in __delattr__
     self.__delitem__(name)
-  File "....../lib/python3.7/site-packages/pyferret/ferdset.py", line 165, in __delitem__
+  File "....../lib/python3.9/site-packages/pyferret/ferdset.py", line 165, in __delitem__
     value._removefromferret()
-  File "....../lib/python3.7/site-packages/pyferret/fervar.py", line 882, in _removefromferret
+  File "....../lib/python3.9/site-packages/pyferret/fervar.py", line 882, in _removefromferret
     raise NotImplementedError('%s is a file variable; close the dataset to remove' % fername)
 NotImplementedError: SST[d=coads_climatology.cdf] is a file variable; close the dataset to remove
 

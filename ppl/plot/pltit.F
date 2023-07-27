@@ -115,6 +115,11 @@
 * v744 *acm* 11/18 Issue 1786: graticule lines & axes drawn if PLOT/OVER/AXES given
 * v76  *acm*  4/20 New flag ribbon_on so that RIBBON/SET; PPL PLOT works correctly
 * v761 *acm*  7/20 Issue 1982. Save XHI, XLO, YHI, YLO Needed for axes on an /OVER/AXES plot.
+* V766  4/22 *acm* For Issue 1009, fixes here to allow sequences such as: 
+*                   FILL/NOAXIS [var]; FILL/OVER/AXES [var]
+*                   For some plots with a time axis, the time axes and/or the overlay 
+*                   plot went missing due to scaling errors
+*		
 
 *****************************************************
 
@@ -147,8 +152,6 @@
 	include 'PLT.INC'
 	include 'pltl_inc.decl'
 	include 'PLTL.INC'
-	include 'mplot_inc.decl'
-	include 'MPLOT.INC'
 	include 'cmrd_inc.decl'
 	include 'CMRD.INC'
 	include 'prmcom_inc.decl'
@@ -197,7 +200,7 @@ CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
      *		.OR.MAKEP.EQ.'VECTOR'.or.makep.eq.'SHADE'   
      *          .or.makep.eq.'FLOWLINE'
      *          .or.makep.eq.'FILL'.or.makep.eq.'PIXEL'
-	CLEAR = .NOT.SOVER .AND. IMCNT.LE.1 .AND. .NOT.PLTOPN
+	CLEAR = .NOT.SOVER .AND. .NOT.PLTOPN
 C	SETUP AXIS FOR ALL PLOT TYPES.
 
 *below	no_vpt_flag = .not.(vpt_was_set .and. ppl_viewports_active)!12.1.89 JD
@@ -210,9 +213,7 @@ C	SETUP AXIS FOR ALL PLOT TYPES.
 *	endif
 
 	IF(.NOT.SOVER .AND. .NOT.PLTOPN)CALL SIZE(WIDTH,HEIGHT)
-#ifdef unix
-*       call flush(lttout)
-#endif
+
 ***********************************************
 * TMAP check that output window is active
 	IF ( PPL_in_FERRET ) CALL CK_GKS_ACTIVE( *4999 )
@@ -260,19 +261,23 @@ C	SETUP AXIS FOR ALL PLOT TYPES.
 	    IF (ITFLG.EQ.1) THEN
 	       TLOX_save = XLO
 	       THIX_save = XHI
+	       DT_SAVE = dt
 	    ENDIF
 	    IF(ITFLG.EQ.-1 .OR. ITFLG.EQ.2) THEN
 	       TLOY_save = YLO
 	       THIY_save = YHI
+	       DT_SAVE = dt
 	    ENDIF
 
 	ELSE
 	    IF(ITFLG.NE.0)THEN
 	        ! Handle time as in setax for short-time axes
 		! Round off to the nearest minute 
-	        IF (is_hours_axis .GT. 0) CALL FIXTIM (ITMIN,ITMAX,IT1,IT2,4)
+	        
+		IF (is_hours_axis .GT. 0) CALL FIXTIM (ITMIN,ITMAX,IT1,IT2,4)
 		TLO = 1. - DIFF(IT1,ITSTRT)/DT
 	        THI=TLO+DIFF(IT1,IT2)/DT
+
 		IF (is_hours_axis .GT. 0) THEN
 		   IF (ITFLG.EQ. 1) THEN
 		      tlo = TLOX_save
@@ -297,6 +302,7 @@ C	SETUP AXIS FOR ALL PLOT TYPES.
 		YLO=TLO
 		IF (contr) CALL CHECK_T_SCALE ('Y', ylo, yhi)
 	    ENDIF
+
 	    IF(CONTR)THEN
 		call trans (0,xmin,ymin,xtm,ytm)
 		call trans (0,xmax,ymax,xtx,ytx)
@@ -307,7 +313,9 @@ C	SETUP AXIS FOR ALL PLOT TYPES.
 		YHPLOT=DBLE(YLEN)+(DBLE(ytx)-DBLE(YHI) )*DBLE(YF)
 
 	    ENDIF
+
 	ENDIF
+
 
 C	DRAW AXIS AND LABELS
 C	DO PLOTTING
@@ -420,7 +428,7 @@ c	    CALL PLOTV(X,NXS,XF,YF)
 	ELSE IF(MAKEP.EQ.'VIEW')THEN
 	    IF(JTYPE.EQ.-1.AND.ivcomp.eq.2) then
 	   	IVLOC=NX*NY+1
-	    ELSE IF(JTYPE.EQ.TLOX_save.AND.ivcomp.eq.2) then
+	    ELSE IF(JTYPE.EQ.-2.AND.ivcomp.eq.2) then
 		IVLOC=NX*NY+NX+NY+1
 	    ELSE
 		IVLOC=1
@@ -510,11 +518,22 @@ c	    CALL PLOTPOL(X,NXS,XF,YF)
 	
 * Draw the plot axes 
 
-	IF (sover) THEN
+	IF (sover .AND. DRAW) THEN
 	   xlo = xlosave
 	   xhi = xhisave
 	   ylo = ylosave
 	   yhi = yhisave
+
+	   IF (ITFLG.EQ.1) THEN
+	       TLO = TLOX_save
+	       THI = THIX_save
+	       DT = DT_save
+	   ENDIF
+	   IF(ITFLG.EQ.-1 .OR. ITFLG.EQ.2) THEN
+	       TLO = TLOY_save
+	       THI = THIY_save
+	       DT = DT_save
+	   ENDIF
 	ENDIF
 
 	did_draw = draw

@@ -52,6 +52,8 @@
 * V702 *acm*11/16  handling read errors in date/time reading
 * V702: *sh* 1/17 - bug fix: mr_protected must *end* at mr_not_in_use (=0)
 *		  - for trac enhancement #2369 -- dynamic memory management 
+* v767 6/22 *acm* See issue 112: Detect whether axis is too large for 4-byte integer indexing
+* 11/2022 *acm* Code cleanup: Modernize DO-loop syntax. 
 
         IMPLICIT NONE
 	include	'tmap_errors.parm'
@@ -73,6 +75,7 @@
 	INTEGER	cx, mr, status
 
 * internal variable declarations:
+	INTEGER*8	CGRID_SIZE8, i8
 	INTEGER 	CGRID_SIZE, CX_DIM_LEN, TM_LENSTR1,
      .			idim, ask_var, category, dset, grid, ivar,
      .			fvar, nvar, the_var, nleft, nsize,
@@ -102,18 +105,18 @@
      .				   ds_file_info_ptr(dset) )
 * locate the step file belonging to this data set
 
-	DO 10 istep = 1,maxstepfiles
+	DO istep = 1,maxstepfiles
 	  IF (sf_setnum(istep) .EQ. dset) GOTO 20
- 10	CONTINUE
+	ENDDO
 	CALL ERRMSG( ferr_internal, status, 'delim stepfile?', *5000)
 
 * create a memory variable for each variable in the file
- 20	DO 400 ivar = 1, nvar
+ 20	DO ivar = 1, nvar
 
 * ... locate the next variable in this data set
-	   DO 100 fvar = fvar+1, maxvars
+	   DO fvar = fvar+1, maxvars
 	      IF ( ds_var_setnum(fvar) .EQ. dset ) GOTO 110
- 100	   CONTINUE
+	   ENDDO
 * ... no more
 	   GOTO 500
 
@@ -135,7 +138,7 @@
 	     cx_grid    ( cx_stack_ptr ) = ds_grid_number( fvar )
 	     cx_bad_data( cx_stack_ptr ) = ds_bad_flag( fvar )	! 12/93 add'n
 	     cx_type    ( cx_stack_ptr ) = ds_var_type( fvar )
-	     DO 200 idim = 1, nferdims
+	     DO idim = 1, nferdims
 	        cx_lo_ss(cx_stack_ptr, idim) = ds_grid_start(idim, fvar)
 	        cx_hi_ss(cx_stack_ptr, idim) = ds_grid_end  (idim, fvar)
 	        cx_by_ss(idim, cx_stack_ptr) = .TRUE.
@@ -143,7 +146,7 @@
 	        IF ( status .NE. ferr_ok ) RETURN
 	        CALL FLESH_OUT_AXIS( idim, cx_stack_ptr, status )
 	        IF ( status .NE. ferr_ok ) RETURN
- 200	     CONTINUE
+	     ENDDO
 
 * reserve and catalog space for the result
 	     CALL CREATE_MEM_VAR( cx_stack_ptr, mrlist(ivar), status )
@@ -153,10 +156,16 @@
 * save index of the desired var
 	   IF ( fvar .EQ. ask_var ) the_var = ivar
 
- 400	CONTINUE
+	ENDDO
 
 * point to asked-for variable and create dummy entries for the rest
- 500	rec_to_read = CGRID_SIZE(cxlist(the_var))
+ 500	CONTINUE
+ 
+	i8 = CGRID_SIZE8(cxlist(the_var))
+ 
+	IF (i8 .GT. arbitrary_large_int4) GOTO 5300
+
+	rec_to_read = i8
 	mr = mrlist( the_var )
 	
 * diagnostic output
@@ -191,7 +200,7 @@
 * update the variables with info about the number of records actually read
 * (for multi-dimensional grid reads just truncate the last axis best we can)
 	IF ( nread .LT. rec_to_read ) THEN
-	   DO 700 ivar = 1, nvar
+	   DO ivar = 1, nvar
 	      IF (field_type(ivar) .NE. FTYP_MISSING) THEN
 	        cx1 = cxlist(ivar)
 	        mr1 = mrlist(ivar)
@@ -219,7 +228,7 @@
 * ... also let the TMAP library know how much is there
 	        ds_grid_end(las_dim, mr_variable(mr1)) = cx_hi_ss( cx1, las_dim )
 	      ENDIF
- 700	   CONTINUE
+	   ENDDO
 	ENDIF
 
 * flag that all the data is available
@@ -233,7 +242,7 @@
 * the data region obtained may be inadequate for the request
 * ("cx" is request, "cx1" is available)
 	cx1 = cxlist(the_var)
-	DO 900 idim = 1, nferdims
+	DO idim = 1, nferdims
 	   IF ( cx_hi_ss(cx,idim) .GT. cx_hi_ss(cx1,idim) ) THEN
 	      IF ( cx_given(idim,cx) ) THEN  ! 3/00 cut mystery cx_last ref.
 * ... error: the user explicitly requested more than there is
@@ -247,7 +256,7 @@
 	         cx_hi_ww(idim,cx) = cx_hi_ww(idim,cx1)
 	      ENDIF
 	   ENDIF
- 900	CONTINUE
+	ENDDO
 
 * set the data type based on the file
 	cx_type(cx) = cx_type(cx1)
@@ -265,11 +274,14 @@
 	ENDIF
  1000   FORMAT ('Delimited file reading: Insufficient memory '
      .        //'reading variable ', i4)
- 1100	DO 5010 nleft = 1, nvar20-1	! delete all initialized so far
- 5010	CALL DELETE_VARIABLE(mrlist(nleft))
+ 1100	DO nleft = 1, nvar20-1	! delete all initialized so far
+	   CALL DELETE_VARIABLE(mrlist(nleft))
+ 	ENDDO
         CALL RELEASE_DYN_WORK_SPACE
-
  5500	RETURN
+ 5300   CALL ERRMSG( ferr_out_of_range, status,
+     .     'data too large to read'//pCR//
+     .      cmnd_buff(:len_cmnd), *5500 )
  5600	CALL ERRMSG( ferr_limits, status,
      .		ww_dim_name(idim)//' axis of '//VAR_CODE(cat_file_var,ask_var),
      .		*5500 )

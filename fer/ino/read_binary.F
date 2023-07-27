@@ -52,6 +52,10 @@
 * V702: *sh* 1/17 - bug fix: mr_protected must *end* at mr_not_in_use (=0)
 *		  - for trac enhancement #2369 -- dynamic memory management 
 *                 (it appears that dynamic work space is allocated but never used)
+* v767 6/22 *acm* See issue 112: Detect whether grid is too large for 4-byte integer indexing
+** 10/2022 *acm* Code cleanup: remove references to obsolete gui interface
+*                TM_SPLIT_MESSAGE replaced by SPLIT_LIST
+* 11/2022 *acm* Code cleanup: Modernize DO-loop syntax. 
 
         IMPLICIT NONE
 	include	'tmap_errors.parm'
@@ -79,8 +83,8 @@
 * internal variable declarations:
 	INTEGER		nferdimsp1 
 	PARAMETER	(nferdimsp1 = nferdims+1)
-	INTEGER 	CGRID_SIZE, 
-     .			idim, ask_var, category, data_set, grid, ivar,
+	INTEGER*8 	CGRID_SIZE8, gsize 
+	INTEGER 	idim, ask_var, category, data_set, grid, ivar,
      .			fvar, nvar20, the_var, nleft, 
      .			cx0, cx1, cx20(20), mr20(20),
      .			mr1, rec1, scnt,
@@ -158,7 +162,13 @@
 		    firstTime = .FALSE.
 
 *       read only what will fit into smallest grid
-		    rec1 = CGRID_SIZE(cx_stack_ptr) / nrepeat
+		    
+		    gsize = CGRID_SIZE8(cx_stack_ptr) 
+		    IF (gsize/nrepeat .LT. arbitrary_large_int4) THEN
+		       rec1 = gsize/ nrepeat
+		    ELSE
+		       GOTO 5300
+		    ENDIF
 		    rec_to_read = MIN( rec_to_read, rec1 )
 
 *       reserve and catalog space for the result
@@ -225,7 +235,7 @@
 * the data region obtained may be inadequate for the request
 * ("cx" is request, "cx1" is available)
 	cx1 = cx20(the_var)
-	DO 900 idim = 1, nferdims
+	DO idim = 1, nferdims
 	   IF ( cx_hi_ss(cx,idim) .GT. cx_hi_ss(cx1,idim) ) THEN
 	      IF ( cx_hi_ss(cx_last,idim) .NE. unspecified_int4
      .	     .OR.  cx_given(idim,cx) ) THEN
@@ -240,7 +250,7 @@
 	         cx_hi_ww(idim,cx) = cx_hi_ww(idim,cx1)
 	      ENDIF
 	   ENDIF
- 900	CONTINUE
+	ENDDO
 
 * successful completion
 	cx_stack_ptr = cx0
@@ -255,16 +265,20 @@
            CALL WARN (ferrmsg)
 	ENDIF
  1000   FORMAT ('Binary file reading: Insufficient memory reading variable ', i4)
-	DO 5010 nleft = 1, nvar20-1	! delete all except last
- 5010	CALL DELETE_VARIABLE(mr20(nleft))
+	DO nleft = 1, nvar20-1	! delete all except last
+ 	   CALL DELETE_VARIABLE(mr20(nleft))
+ 	ENDDO
 	CALL BR_CLOSE()
  5500	RETURN
+ 5300   CALL ERRMSG( ferr_out_of_range, status,
+     .     'data too large to read'//pCR//
+     .      cmnd_buff(:len_cmnd), *5500 )
  5600	CALL ERRMSG( ferr_limits, status,
      .		ww_dim_name(idim)//' axis of '//VAR_CODE(cat_file_var,ask_var),
      .		*5500 )
  6000	CALL BR_GET_ERROR(cerrmsg)
 	CALL TM_CTOF_STRNG(cerrmsg, ferrmsg, 255)
-	CALL TM_SPLIT_MESSAGE(err_lun, ' **ERROR: '//ferrmsg(1:LEN(ferrmsg)))
+	CALL SPLIT_LIST(0, err_lun, ' **ERROR: '//ferrmsg(1:LEN(ferrmsg)), 0)
         CALL ERRMSG( ferr_TMAP_error, status, ' ', *4900 )
 	END	
 

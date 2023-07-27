@@ -101,7 +101,6 @@
 * V602  4/07 *acm* - Add RETURN=xmod,tmod
 * V615 11/08 *acm* - fixing bug 1523. If the variable contains a grid-changing 
 *                    function, we will do a full evaluation to get its size
-* V68  *acm* 1/12  ifdef double_p for double-precision ferret.
 *       *acm* 3/12 Add E and F dimensions (use nferdims in tmap_dims.parm)
 * V684 *acm* 12/12 Add data type of DOUBLE for return=dtype
 * V685 *sh*  11/13 Add return=status and return=ready
@@ -134,6 +133,9 @@
 * V745  4/19 *acm* ticket 1916, special handling getting context for RETURN= outputs
 * V751  6/19 *acm* ticket 1929, don't chop off str_len when testing for reformatting at the end
 * V7.63 9/20 *acm* add `var,RETURN=*coord` to get coordinate variables for DSG datasets
+*       5/22 *acm* See issue 112: to allow for large grids, call CGRID_SIZE8 on RETURN=size
+* 11/2022 *acm* Code cleanup: Modernize DO-loop syntax. 
+C 12/2022 *acm* Code cleanup: Fixes to calls to CHECK_DATE_REFORMAT
 
         IMPLICIT NONE
 #include "netcdf.inc"
@@ -175,10 +177,11 @@
      .            attid, ieq, base_isp, base_cx, cat, var, uvar,
      .            i1ss, inss, grid, ucode, dotidx, shorterlen,
      .            hi_cx, item, itype, start, len_name, var_status, 
-     .            siz, ifeature
+     .            siz, ifeature, cal_id
+	INTEGER*8 CGRID_SIZE8, i8
 	REAL	  result, val, aval
 	REAL*8 TM_WORLD, TM_WW_AXLEN, ww
-	CHARACTER TM_FMT*48, LEFINT*16, VAR_TITLE*(max_len),
+	CHARACTER TM_FMT*48, LEFINT*16, LEFINT8*16, VAR_TITLE*(max_len),
      .		  VAR_UNITS*(max_len), GET_STRING_ELEMENT*(max_len), 
      .		  VAR_CODE*1024,
      .		  repl*(max_len), bad_str*(max_len), return_errmsg*256,
@@ -187,11 +190,7 @@
 
 * local parameter declarations
 	CHARACTER	tab*1
-#ifdef NO_INTRINSIC_IN_PARAMETER
-	PARAMETER     ( tab = o'011' )
-#else
 	PARAMETER     ( tab = CHAR(9))
-#endif
 
         DATA typstring/
      .  'Notype', 'BYTE', 'CHAR', 'SHORT', 'INT4', 'FLOAT', 'DOUBLE' /
@@ -224,15 +223,9 @@
 	itmp = INDEX(cmnd(istart:),'`')
         IF ( itmp .EQ. 0 ) RETURN
 	istart = istart + itmp
-#ifdef NO_DOUBLE_ESCAPE_SLASH
 	IF ( istart .GT. 2 ) THEN
-	   IF (cmnd(istart-2:istart-2) .EQ. '\') GOTO 10  ! ' for emacs
+	   IF (cmnd(istart-2:istart-2) .EQ. '\') GOTO 10
 	ENDIF
-#else
-	IF ( istart .GT. 2 ) THEN
-	   IF (cmnd(istart-2:istart-2) .EQ. '\\') GOTO 10  
-	ENDIF
-#endif
 
 * locate the end of the next grave accent pair
 * Note: no check for backslash-escaped accent here because properly paired
@@ -307,8 +300,9 @@
 	GOTO 149	! nope - no equal sign
 
 * ... locate the comma following the mathematical expression
-  99	DO 100 i = i, istart, -1
- 100	IF ( cmnd(i:i) .EQ. ',' ) GOTO 101
+  99	DO i = i, istart, -1
+	IF ( cmnd(i:i) .EQ. ',' ) GOTO 101
+ 	ENDDO
 	GOTO 5500			! no comma ???
  101	iend = i - 1
 * ... now decode the name/value pairs following the comma
@@ -373,8 +367,9 @@
 * ======
 
 * is the expression just white space?	(1/96 ... quick fix with GOTO's)
- 149	DO 150 i = istart, iend
- 150	IF ( cmnd(i:i) .NE. ' ' .AND. cmnd(i:i) .NE. tab ) GOTO 160
+ 149	DO i = istart, iend
+	   IF ( cmnd(i:i) .NE. ' ' .AND. cmnd(i:i) .NE. tab ) GOTO 160
+ 	ENDDO
 * ... weird - they gave us pure white space - no numerical result possible
 	repl = bad_str
 	str_len = 3
@@ -528,8 +523,8 @@
 		    ENDIF
 	         ENDIF
 	         str_len = TM_LENSTR1(repl)
-	         CALL CHECK_DATE_REFORMAT (repl, str_len, 
-     .              TM_GET_CALENDAR_ID ( line_cal_name(axis)), status)
+		 cal_id = TM_GET_CALENDAR_ID ( line_cal_name(axis))
+	         CALL CHECK_DATE_REFORMAT (repl, str_len, cal_id, status)
 	         GOTO 500
 
 * ... RETURN=F0
@@ -547,8 +542,8 @@
                     ENDIF
 	         ENDIF
 	         str_len = TM_LENSTR1(repl)
-		 CALL CHECK_DATE_REFORMAT (repl, str_len, 
-     .                       TM_GET_CALENDAR_ID ( line_cal_name(axis)))
+		 cal_id = TM_GET_CALENDAR_ID ( line_cal_name(axis))
+	         CALL CHECK_DATE_REFORMAT (repl, str_len, cal_id, status)
 	         GOTO 500
               
 * ... RETURN=CALENDAR
@@ -858,8 +853,9 @@
                   ENDIF
 	      ENDIF
 	      str_len = TM_LENSTR1(repl)
+	      cal_id = TM_GET_CALENDAR_ID ( line_cal_name(axis))
 	      CALL CHECK_DATE_REFORMAT (repl(:str_len*2), str_len, 
-     .                    TM_GET_CALENDAR_ID ( line_cal_name(axis)))
+     .                    cal_id, status)
 
 * ... RETURN=F0
 	   ELSEIF ( repl .EQ. "F0" ) THEN
@@ -874,8 +870,8 @@
                   ENDIF
 	      ENDIF
 	      str_len = TM_LENSTR1(repl)
-	      CALL CHECK_DATE_REFORMAT (repl, str_len, 
-     .                    TM_GET_CALENDAR_ID ( line_cal_name(axis)))
+	      cal_id = TM_GET_CALENDAR_ID ( line_cal_name(axis))
+	      CALL CHECK_DATE_REFORMAT (repl, str_len, cal_id, status)
               
 * ... RETURN=CALENDAR
 	   ELSEIF ( repl(1:3) .EQ. "CAL" ) THEN
@@ -962,19 +958,8 @@
 	   ELSEIF ( repl .EQ. "SIZE"  .AND. 
      .              INDEX(cmnd(istart:iend),'.') .EQ. 0) THEN
 
-	      i2 = CGRID_SIZE ( cx )
-	      repl = LEFINT(i2, str_len)
-
-* The above overflows integer storage? Compute as a real.
-	      IF (i2 .LT. 0) THEN  
-	         result = 1.
-	         DO idim = 1, nferdims
-	            i2 = CX_DIM_LEN(idim, cx)
-		    result = result * i2
-	         ENDDO
-		 repl = TM_FMT( result, use_digits, 22, str_len )
-
-	      ENDIF
+	      i8 = CGRID_SIZE8 ( cx )
+	      repl = LEFINT8(i8, str_len)
 
 * ... RETURN=BAD
 	   ELSEIF ( repl .EQ. "BAD" ) THEN
@@ -1277,7 +1262,7 @@ c		    ENDIF
 * ... make sure the result is a single, valid value
 	   
 	   is_dsg = .FALSE.
-	   IF ( CGRID_SIZE(cx) .NE. 1 ) THEN
+	   IF ( CGRID_SIZE8(cx) .NE. 1 ) THEN
 
 *    For DSG grids the requested region may be just in the WW context in E
 	      is_dsg = TM_ITSA_DSG( cx_grid(cx) )

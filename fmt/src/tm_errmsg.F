@@ -72,7 +72,8 @@
 *                 **Internet Data error 
 * V63  *acm* 10/09 Changes for gfortran build
 * V68  *acm*  4/11 Error codes for NetCDF-4 (HDF) errors are in the range -101 to -116
-
+* V767 *acm*  6/22 Cleanup, removing old unused ifdefs
+** 10/2022 *acm* Code cleanup: remove references to obsolete gui interface
 
 * arguments:
 *	status_in	- error code from calling program
@@ -98,8 +99,6 @@
 	external xstep_files_data
 	include 'xdiag_ctrl.cmn_text'
 	external xdiag_ctrl_data
-!	include 'xalt_messages.cmn_text'	! w/ alt_messages
-	external xalt_messages_data
 
 * argument definitions
 	CHARACTER*(*)	routine, expected, found
@@ -107,7 +106,7 @@
 
 * local definitions
 	CHARACTER*2048	TM_CMPRSS, expbuff, fndbuff
-	CHARACTER*2048	errbuf	! introduced for GUI-SPLIT messages
+	CHARACTER*2048	errbuf	
         CHARACTER*2048  symbuf  ! for symbol FER_LAST_ERROR
 	INTEGER		sf_len, des_len, TM_LENSTR1, msg_len, exp_len,
      .			fnd_len, rtn_len, len_symbuf, ier, ist, cdferr
@@ -141,42 +140,13 @@ c#endif
 * fetch the system error codes for most recent error
 
 	IF ( status_in .EQ. merr_erreq ) THEN
-#ifdef unix
-#ifdef F90_SYSTEM_ERROR_CALLS
-	  call linux_perror(expbuff)
-#else
           CALL GERROR(expbuff)       ! get system error message
-#endif
 	  msg_len = TM_LENSTR1(expbuff)
 	  WRITE (errbuf,1000) expbuff(:msg_len)
-	  CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	  CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
           msg_len = TM_LENSTR1(errbuf)
           symbuf(len_symbuf:) = errbuf(:msg_len)
           len_symbuf = len_symbuf + msg_len + 1
-#else
-* VMS code by Mark Renton
-	  CALL ERRSNS ( fnum, rmssts, rmsstv, iunit, condval )
-	  IF ( ( rmssts .EQ. 0 ) .AND. ( rmsstv .EQ. 0 ) ) THEN
-	    msgvec ( 1 ) = 1
-	    msgvec ( 2 ) = condval
-	    msgvec ( 3 ) = 0
-	  ELSE
-	    msgvec ( 1 ) = 1
-	    msgvec ( 2 ) = rmssts
-	    IF ( rmsstv .ne. 0 ) THEN
-	      msgvec ( 1 ) = 2
-	      msgvec ( 3 ) = rmsstv
-	    ENDIF
-	  ENDIF
-* output the message but, SYS_PUTMSG needs a <cr> sent afterword
-	  CALL SYS_PUTMSG ( msgvec, , , )
-	  WRITE (errbuf,1000) expbuff(:msg_len)
-	  CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
-          msg_len = TM_LENSTR1(errbuf)
-          symbuf(len_symbuf:) = errbuf(:msg_len)
-          len_symbuf = len_symbuf + msg_len + 1
-
-#endif
 
 * Output the message for a regular error; errors from cd_open_dset
 * are treated here.
@@ -186,7 +156,7 @@ c#endif
           IF (status_in .EQ. merr_nc_open) THEN
 	     msg_len = TM_LENSTR1(expected)
 	     WRITE (errbuf,1001) 
-	     CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	     CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
              msg_len = TM_LENSTR1(errbuf)
              symbuf(len_symbuf:) = errbuf(:msg_len)
              len_symbuf = len_symbuf + msg_len + 1
@@ -195,7 +165,7 @@ c#endif
           ELSE IF (status_in .EQ. merr_remote_open) THEN
 	     msg_len = TM_LENSTR1(expected)
 	     WRITE (errbuf,1002) 
-	     CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	     CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
              msg_len = TM_LENSTR1(errbuf)
              symbuf(len_symbuf:) = errbuf(:msg_len)
              len_symbuf = len_symbuf + msg_len + 1
@@ -206,7 +176,7 @@ c#endif
              msg_len = TM_LENSTR1(msg_regular(status_in - pregular))
              WRITE (errbuf,1000)
      .		 msg_regular(status_in - pregular)(:msg_len)
-             CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+             CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
              msg_len = TM_LENSTR1(errbuf)
              symbuf(len_symbuf:) = errbuf(:msg_len)
              len_symbuf = len_symbuf + msg_len + 1
@@ -221,11 +191,12 @@ c#endif
 
 	ELSEIF ( (status_in .GE. pcdferr-120) .AND.
      .		 (status_in .LE. pcdferr + pcdferrmax) ) THEN
+
 * xxxxx can we get filename from netCDF call ???           
 * xxxxx cdfid and varid are available as dset_num, sf_num
            cdferr = status_in - pcdferr
            CALL CD_TRANSLATE_ERROR (cdferr, errbuf)
-	   CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	   CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
 
            msg_len = TM_LENSTR1(errbuf)
            symbuf(len_symbuf:) = errbuf(:msg_len)
@@ -234,7 +205,7 @@ c#endif
            IF (expected .NE. no_errstring) THEN
 	     errbuf = ' '
 	     WRITE (errbuf,*) expected
-	     CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	     CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
              msg_len = TM_LENSTR1(errbuf)
              symbuf(len_symbuf:) = errbuf(:msg_len)
              len_symbuf = len_symbuf + msg_len + 1
@@ -242,7 +213,7 @@ c#endif
            IF (found .NE. no_errstring) THEN
 	     errbuf = ' '
 	     WRITE (errbuf,*) found
-	     CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)   
+	     CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)   
              msg_len = TM_LENSTR1(errbuf)
              symbuf(len_symbuf:) = errbuf(:msg_len)
              len_symbuf = len_symbuf + msg_len + 1
@@ -252,7 +223,7 @@ c#endif
 * unrecognized error code ?
 	ELSE
 	  WRITE (errbuf,1100) status_in
-	  CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	  CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
 1100	  FORMAT(' *** Unknown error code:',I10,' *** ')
           msg_len = TM_LENSTR1(errbuf)
           symbuf(len_symbuf:) = errbuf(:msg_len)
@@ -274,14 +245,14 @@ cc	    fndbuff = TM_CMPRSS(found)
 	    fndbuff = found(1:fnd_len)
 	    WRITE (errbuf,1200) expbuff(1:exp_len),
      .				      fndbuff(1:fnd_len)
-	    CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	    CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
 1200	    FORMAT(13X,'Expected: ',A,' Found: ',A)
             msg_len = TM_LENSTR1(errbuf)
             symbuf(len_symbuf:) = errbuf(:msg_len)
             len_symbuf = len_symbuf + msg_len + 1
 	  ELSE
 	    WRITE (errbuf,1300) expbuff(1:exp_len)
-	    CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	    CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
  1300       FORMAT(13X,A)
             symbuf(len_symbuf:) = expbuff(:exp_len)
             len_symbuf = len_symbuf + exp_len + 1
@@ -294,7 +265,7 @@ cc	    fndbuff = TM_CMPRSS(found)
 	  des_len = TM_LENSTR1(ds_des_name(dset_num))
 	  WRITE (errbuf,1300)
      .		 'Data set: '//ds_des_name(dset_num)(:des_len)
-	  CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)             
+	  CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)             
           msg_len = TM_LENSTR1(errbuf)
           symbuf(len_symbuf:) = errbuf(:msg_len)
           len_symbuf = len_symbuf + msg_len + 1
@@ -305,14 +276,13 @@ cc	    fndbuff = TM_CMPRSS(found)
 	  sf_len = TM_LENSTR1(sf_name(sf_num))
 	  WRITE (errbuf,1300)
      .           'Data file: '//sf_name(sf_num)(:sf_len)
-	  CALL TM_SPLIT_MESSAGE(lunit_errors, errbuf)
+	  CALL SPLIT_LIST(0, lunit_errors, errbuf, 0)
           msg_len = TM_LENSTR1(errbuf)
           symbuf(len_symbuf:) = errbuf(:msg_len)
           len_symbuf = len_symbuf + msg_len + 1
 	ENDIF
 
 * print blank line to set off error messages
-! 4000   IF ( .NOT.alt_messages) WRITE (lunit_errors, *)
  4000	CONTINUE
 
 * Generate symbol containing the whole error message

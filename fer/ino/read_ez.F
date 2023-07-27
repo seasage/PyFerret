@@ -64,6 +64,8 @@
 * V685 *acm* 1/13  Ticket 2030: if we run out of  issue a new message
 * V702: *sh* 1/17 - bug fix: mr_protected must *end* at mr_not_in_use (=0)
 *		  - for trac enhancement #2369 -- dynamic memory management 
+* v767 6/22 *acm* See issue 112: Detect whether axis is too large for 4-byte integer indexing
+* 11/2022 *acm* Code cleanup: Modernize DO-loop syntax. 
 
         IMPLICIT NONE
 	include	'tmap_errors.parm'
@@ -83,7 +85,8 @@
 	INTEGER	cx, mr, status
 
 * internal variable declarations:
-	INTEGER 	CGRID_SIZE, CX_DIM_LEN,
+	INTEGER*8 	CGRID_SIZE8, gsize 
+	INTEGER 	CX_DIM_LEN,
      .			idim, ask_var, category, data_set, grid, ivar,
      .			fvar, nvar20, the_var, nleft, nsize,
      .			cx0, cx1, cx20(20), mr20(20), nread,
@@ -119,17 +122,17 @@
 !	CALL PURGE_DSET( data_set )
 
 * create a memory variable for each of up-to-20 variables in the file
-	DO 400 ivar = 1, 20
+	DO ivar = 1, 20
 
 * ... locate the next variable in this data set
-	   DO 100 fvar = fvar+1, maxvars
+	   DO fvar = fvar+1, maxvars
 	      IF ( ds_var_setnum( fvar ) .EQ. data_set ) GOTO 110
- 100	   CONTINUE
+	   ENDDO
 * ... no more
 	   GOTO 500
 
 * ... is it a dummy '-' placeholder in the variable list ?
- 110	   IF (INDEX( ds_var_code(fvar),'-') .NE. 0 ) GOTO 400
+ 110	   IF (INDEX( ds_var_code(fvar),'-') .NE. 0 ) CYCLE
 
 * save record of which is the desired var
 	   nvar20 = nvar20 + 1
@@ -143,7 +146,7 @@
 	   cx_variable( cx_stack_ptr ) = fvar
 	   cx_grid( cx_stack_ptr ) = ds_grid_number( fvar )
 	   cx_bad_data( cx_stack_ptr ) = ds_bad_flag( fvar )	! 12/93 add'n
-	   DO 200 idim = 1, nferdims
+	   DO idim = 1, nferdims
 	      cx_lo_ss( cx_stack_ptr, idim ) = ds_grid_start( idim, fvar )
 	      cx_hi_ss( cx_stack_ptr, idim ) = ds_grid_end  ( idim, fvar )
 	      cx_by_ss( idim, cx_stack_ptr ) = .TRUE.
@@ -151,10 +154,12 @@
 	      IF ( status .NE. ferr_ok ) RETURN
 	      CALL FLESH_OUT_AXIS( idim, cx_stack_ptr, status )
 	      IF ( status .NE. ferr_ok ) RETURN
- 200	   CONTINUE
+	   ENDDO
 
 * read only what will fit into smallest grid
-	   rec1 = CGRID_SIZE(cx_stack_ptr) / nrepeat
+
+	   gsize = CGRID_SIZE8(cx_stack_ptr) 
+	   IF (gsize/nrepeat .LT. arbitrary_large_int4) rec1 = gsize/ nrepeat
 	   rec_to_read = MIN( rec_to_read, rec1 )
 	   IF (rec_to_read .LE. 0 ) GOTO 5650
 
@@ -162,12 +167,14 @@
 	   CALL CREATE_MEM_VAR( cx_stack_ptr, mr20(nvar20), status )
 	   IF ( status .NE. ferr_ok ) GOTO 5000
 
- 400	CONTINUE
+	ENDDO
 
 * point to asked-for variable and create dummy entries for the rest
- 500	mr = mr20( the_var )
-	DO 600 nleft = nvar20+1, 20
- 600	mr20(nleft) = dummy_mr
+ 500	CONTINUE
+	mr = mr20( the_var )
+	DO nleft = nvar20+1, 20
+	   mr20(nleft) = dummy_mr
+ 	ENDDO
 	
 * allocate a buffer big enough for one record
 	i8_size = columns
@@ -210,7 +217,7 @@
 * update the variables with info about the number of records actually read
 * (for multi-dimensional grid reads just truncate the last axis best we can)
 	IF ( nread .LT. rec_to_read ) THEN
-	   DO 700 ivar = 1, nvar20
+	   DO ivar = 1, nvar20
 	      cx1 = cx20(ivar)
 	      mr1 = mr20(ivar)
 	      CALL GET_CX_DIMS( cx1, ndim, dims )
@@ -225,7 +232,9 @@
 	      ELSEIF( ndim .EQ. 2 ) THEN
 	         nsize = CX_DIM_LEN(fst_dim,cx1)
 	      ELSE
-	         nsize =  CGRID_SIZE(cx1) / CX_DIM_LEN(las_dim,cx1)
+		 gsize = CGRID_SIZE8(cx1) 
+		 IF (gsize .GT. arbitrary_large_int4) GOTO 5660
+		 nsize =  gsize / CX_DIM_LEN(las_dim,cx1)
 	      ENDIF
 * ... last dim (each var) is
 *     (total values read)/(prod. of all axis lengths except last)
@@ -236,7 +245,7 @@
 	      mr_hi_ww( las_dim, mr1 ) = cx_hi_ww( las_dim, cx1 )
 * ... also let the TMAP library know how much is there
 	      ds_grid_end(las_dim, mr_variable(mr1)) = cx_hi_ss( cx1, las_dim )
- 700	   CONTINUE
+	   ENDDO
 	ENDIF
 
 * flag that all the data is available
@@ -248,7 +257,7 @@
 * the data region obtained may be inadequate for the request
 * ("cx" is request, "cx1" is available)
 	cx1 = cx20(the_var)
-	DO 900 idim = 1, nferdims
+	DO idim = 1, nferdims
 	   IF ( cx_hi_ss(cx,idim) .GT. cx_hi_ss(cx1,idim) ) THEN
 	      IF ( cx_given(idim,cx) ) THEN  ! 3/00 cut mystery cx_last ref.
 * ... error: the user explicitly requested more than there is
@@ -262,7 +271,7 @@
 	         cx_hi_ww(idim,cx) = cx_hi_ww(idim,cx1)
 	      ENDIF
 	   ENDIF
- 900	CONTINUE
+	ENDDO
 
 * successful completion
 	cx_stack_ptr = cx0
@@ -276,8 +285,9 @@
            CALL WARN (errbuff)
 	ENDIF
  1000   FORMAT ('ASCII file reading: Insufficient memory reading variable ', i4)
-	DO 5010 nleft = 1, nvar20-1	! delete all except last
- 5010	CALL DELETE_VARIABLE(mr20(nleft))
+	DO nleft = 1, nvar20-1	! delete all except last
+	   CALL DELETE_VARIABLE(mr20(nleft))
+ 	ENDDO
         CALL  RELEASE_DYN_WORK_SPACE
  5500	RETURN
  5600	CALL ERRMSG( ferr_limits, status,
@@ -285,6 +295,8 @@
      .		*5500 )
  5650	CALL ERRMSG( ferr_limits, status,
      .		'/COLUMNS is impossibly large', *5500 )
+ 5660	CALL ERRMSG( ferr_limits, status,
+     .		'/COLUMNS is impossibly large or total size too large', *5500 )
  5700	CALL ERRMSG( ferr_TMAP_error, status, ' ', *4900 )
  6000	CALL ERRMSG( ferr_internal, status, 'READ_EZ ??', *4900 )
 	END	

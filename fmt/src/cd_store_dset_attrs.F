@@ -43,6 +43,8 @@
 * v604 *acm* 7/07 increase length of ds_name, ds_des_name
 * v62  *acm* 6/08 cleanup; no need for the variable called buff.
 * V6.74 3/12 *acm* cleanup ifdefs and unnecessary include files
+* v767  6/22 *acm* issue 112: detect and report dimension too large for 4-byte integer indexing
+
 
 * argument definitions:
 *       dset    - pointer to TMAP data set
@@ -70,14 +72,8 @@
       INTEGER NCF_GET_DSNUM, llen, slen1, slen2
       PARAMETER (slen1=2048)      ! size of ds_name string
       PARAMETER (slen2=2048)      ! size of ds_des_name string (should this be even longer??)
-
-#ifdef sun
-      BYTE      fhol_dsname(slen1)      ! c-type Hollerith string buffer
-      BYTE      fhol_dspath(slen2)
-#else
       INTEGER*1 fhol_dsname(slen1)      ! c-type Hollerith string buffer
       INTEGER*1 fhol_dspath(slen2)
-#endif
 
 * Successfully opened the dataset (stepfile). 
 * Save dataset info in GLOBAL_NCdsetList for attribute handling
@@ -86,12 +82,14 @@
       CALL TM_FTOC_STRNG( ds_name(dset)(1:llen), fhol_dsname, slen1 )
       llen = TM_LENSTR1( ds_des_name(dset) )
       CALL TM_FTOC_STRNG( ds_des_name(dset)(1:llen), fhol_dspath, slen2 )
-
       cdfstat = NCF_ADD_DSET (cdfid, dset, fhol_dsname, fhol_dspath) 
+
       IF ( cdfstat .EQ. merr_badfileatt ) THEN
          CALL WARN (
      .   'attribute type mismatch or other attribute reading error '//
      .    ds_des_name(dset)(1:llen)) 
+      ELSE IF ( cdfstat .EQ. merr_dimtoolarge ) THEN
+	 GOTO 5200
       ELSE IF ( cdfstat .NE. merr_ok ) THEN
          GOTO 5100
       ENDIF
@@ -102,8 +100,11 @@
 
 * error messages
  5100   CALL TM_ERRMSG
-     .     ( cdfstat+pcdferr, status, 'CD_STORE_DSET_ATTRS', cdfid,
+     .     ( cdfstat+pcdferr, status, 'CD_STORE_DSET_ATTRS', dset,
      .        no_varid, 'is this a CDF file ?', no_errstring, *5900 )
+ 5200   CALL TM_ERRMSG
+     .     ( cdfstat, status, 'CD_STORE_DSET_ATTRS', dset,
+     .        no_varid, 'Long dimensions not implemented', no_errstring, *5900 )
 * erase any record of tampering with this data set
  5900   CALL TM_CLOSE_SET( dset, i )
 

@@ -56,6 +56,10 @@
 * V71   2/17 *acm* ticket 2507, further fix for when several variables have the same grid.
 * V72 8/17 *acm*   For trac enhancement #767 -- dynamic coordinate storage
 * V74 1/18 *acm*   Issue 1853 correctly handle aggregations of one timestep
+* v767 6/22 *acm* See issue 112: Detect whether T dimension becomes too 
+*                 large for 4-byte integer indexing
+C 12/2022 *acm* Code cleanup: Declare variable tedge as array to avoid rank-mismatch 
+*               errors when compiling under gfortran v10.
 
         IMPLICIT NONE
         include 'tmap_errors.parm'
@@ -111,9 +115,9 @@
 	REAL	TM_WORLD_AX, T0_ADJUST, GET_LINE_COORD, TM_WW_AXLEN,
      .		SECS_FROM_BC, 
      .		tt, delta, highest_tstep, dfirst_delta, 
-     .		depsilon, start, tunit, hdel, tstep, tedge, tn, 
+     .		depsilon, start, tunit, hdel, tstep, tedge(1), tn, 
      .		memb_sort(nagfiles), axwwlen, bc_to_t0, secsperyear, 
-     .		secs2start, timefac
+     .		secs2start, timefac, steps_total
 	CHARACTER LEFINT*20, lname*20, vname*64, bname*12, units_str*128,
      .		  calendar_str*128, agg_t0_str*20, file_t0_str*20
 
@@ -188,6 +192,9 @@
 	   memb_tstep_start(ifile) = GET_LINE_COORD (linemem(iline)%ptr, 1)
 	   memb_tstep_end  (ifile) = GET_LINE_COORD (linemem(iline)%ptr, nsteps)
 
+	   steps_total = nsteps
+	   IF (steps_total .GT. arbitrary_large_int4) GOTO 5500
+
 	      DO ifile = 2, nagfiles
 * ... first read the length of the time axis from the file to be aggregated
 	         CALL CD_QUIK_NCOPEN (dset_num, memb_filename(ifile),
@@ -205,6 +212,9 @@
      .				          file_unit_code, file_t0_str,
      .					  agg_unit_code,  agg_t0_str, status )
 	         memb_nsteps(ifile) = nsteps
+
+		 steps_total = steps_total + nsteps
+		 IF (steps_total .GT. arbitrary_large_int4) GOTO 5500
 
 * grab a temporary dynamic axis slot for it
 	         CALL TM_ALLO_TMP_LINE(iline, status)
@@ -278,7 +288,7 @@
      .                    tedge,  
      .                    d1s, d1e, d2s, d2e, status )
                     IF ( status .NE. merr_ok ) GOTO 5010
-		    CALL PUT_LINE_COORD ( lineedg(iline)%ptr, nsteps+1, tedge)
+		    CALL PUT_LINE_COORD ( lineedg(iline)%ptr, nsteps+1, tedge(1))
 
 * ... adjust the bounds values to the agg-wide "<units> since <T0>"
 	            IF (need_T0_adjust) THEN
@@ -382,7 +392,7 @@ C check for overlap???
 	   IF (nsteps.EQ.1) GOTO 100
 
 	   tt  = GET_LINE_COORD (linemem(taxis)%ptr, 1)
-	   tedge = GET_LINE_COORD (lineedg(taxis)%ptr, 1)
+	   tedge(1) = GET_LINE_COORD (lineedg(taxis)%ptr, 1)
 
 * Use this double loop to report errors relative to the member datasets
 	   istep = 1
@@ -394,9 +404,9 @@ C check for overlap???
 	         ELSE
 	            istep = istep + 1
 	            tn = GET_LINE_COORD (linemem(taxis)%ptr, istep)
-	            tedge = GET_LINE_COORD (lineedg(taxis)%ptr, istep)
+	            tedge(1) = GET_LINE_COORD (lineedg(taxis)%ptr, istep)
 	            IF (tn .LE. tt) GOTO 5300
-	            IF (tn .LE. tedge) GOTO 5400
+	            IF (tn .LE. tedge(1)) GOTO 5400
 	            tt = tn
 		 ENDIF
 	      ENDDO
@@ -530,5 +540,8 @@ C check for overlap???
 	CALL ERRMSG( ferr_grid_definition, status,
      .   'Time bounds do not enclose time step coordinate at L='
      .		//lname(:blen)//' of file '//memb_filename(ifile), *5000 )
+ 5500   CALL ERRMSG(ferr_grid_definition, status,
+     .     'Aggregated dimension too long for 4-byte integer indexing: '
+     .		//'Long dimensions not implemented', *5000)
 
 	END
